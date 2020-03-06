@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use Auth;
 use App\Organisation;
 use App\Services\OrganisationService;
 use App\Mail\OrganisationCreated;
@@ -30,18 +31,15 @@ class OrganisationController extends ApiController
           'subscribed' => 'required|boolean'
         ]);
 
+        $user = Auth::user();
+
         /** @var Organisation $organisation */
         $organisation = $service->createOrganisation($this->request->all());
 
-        $organisation->update([
-          'trial_end' => Carbon::now()->add(30, 'days'),
-          'owner_user_id' => $request->user()->id
-        ]);
-
-        Mail::to($request->user())->send(new OrganisationCreated($organisation));
+        Mail::to($user)->send(new OrganisationCreated($organisation));
 
         return $this
-            ->transformItem('organisation', $organisation, ['user'])
+            ->transformItem('organisation', $organisation, [$user])
             ->respond();
     }
 

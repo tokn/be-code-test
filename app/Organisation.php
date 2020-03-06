@@ -37,10 +37,12 @@ class Organisation extends Model
       'subscribed'
     ];
 
+
     /**
      * @var array
      */
     protected $dates = [
+        'trial_end',
         'deleted_at',
     ];
 
@@ -50,5 +52,17 @@ class Organisation extends Model
     public function owner(): BelongsTo
     {
         return $this->belongsTo(User::class, 'owner_user_id');
+    }
+
+    /**
+     * getTrialEndAttribute Return a UNIX timestamp if field is set
+     * @param mixed $value System attribute value - may be null
+     * @return mixed
+     */
+    public function getTrialEndAttribute($value) {
+      if (is_null($value)) {
+        return $value;
+      }
+      return Carbon::create($value)->timestamp;
     }
 }
