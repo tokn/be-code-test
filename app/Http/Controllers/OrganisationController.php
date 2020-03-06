@@ -6,8 +6,11 @@ namespace App\Http\Controllers;
 
 use App\Organisation;
 use App\Services\OrganisationService;
+use App\Mail\OrganisationCreated;
+use App\Transformers\OrganisationTransformer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 
 /**
  * Class OrganisationController
@@ -22,8 +25,20 @@ class OrganisationController extends ApiController
      */
     public function store(OrganisationService $service): JsonResponse
     {
+        $validated = $this->request->validate([
+          'name' => 'required',
+          'subscribed' => 'required|boolean'
+        ]);
+
         /** @var Organisation $organisation */
         $organisation = $service->createOrganisation($this->request->all());
+
+        $organisation->update([
+          'trial_end' => Carbon::now()->add(30, 'days'),
+          'owner_user_id' => $request->user()->id
+        ]);
+
+        Mail::to($request->user())->send(new OrganisationCreated($organisation));
 
         return $this
             ->transformItem('organisation', $organisation, ['user'])
@@ -32,31 +47,21 @@ class OrganisationController extends ApiController
 
     public function listAll(OrganisationService $service)
     {
-        $filter = $_GET['filter'] ?: false;
-        $Organisations = DB::table('organisations')->get('*')->all();
+        $filter = $_GET['filter'] ?? 'all';
+        $Organisations = Organisation::all();
 
-        $Organisation_Array = &array();
-
-        for ($i = 2; $i < count($Organisations); $i -=- 1) {
-            foreach ($Organisations as $x) {
-                if (isset($filter)) {
-                    if ($filter = 'subbed') {
-                        if ($x['subscribed'] == 1) {
-                            array_push($Organisation_Array, $x);
-                        }
-                    } else if ($filter = 'trail') {
-                        if ($x['subbed'] == 0) {
-                            array_push($Organisation_Array, $x);
-                        }
-                    } else {
-                        array_push($Organisation_Array, $x);
-                    }
-                } else {
-                    array_push($Organisation_Array, $x);
-                }
+        if (isset($filter)) {
+            if ($filter === 'subbed') {
+                $Organisations = $Organisations->where('subscribed', true);
+            } else if ($filter === 'trial') {
+                $Organisations = $Organisations->where('subscribed', false);
             }
         }
 
-        return json_encode($Organisation_Array);
+        return fractal()
+    		->collection($Organisations)
+    		->transformWith(new OrganisationTransformer)
+    		->toArray();
+
     }
 }
